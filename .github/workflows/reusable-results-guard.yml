@@ -1,0 +1,48 @@
+name: reusable-results-guard
+
+on:
+  workflow_call:
+    inputs:
+      repo_root:
+        description: Repository subdirectory to validate
+        required: false
+        type: string
+        default: .
+
+jobs:
+  validate-results:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate RESULTS.md and raw JSON
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd "${{ inputs.repo_root }}"
+
+          if [[ ! -f "RESULTS.md" ]]; then
+            echo "RESULTS.md is required"
+            exit 1
+          fi
+
+          if [[ ! -d "reports/raw" ]]; then
+            echo "reports/raw is required"
+            exit 1
+          fi
+
+          raw_files="$(find reports/raw -maxdepth 1 -type f -name '*.json' | sort)"
+          if [[ -z "${raw_files}" ]]; then
+            echo "at least one raw JSON file is required"
+            exit 1
+          fi
+
+          while IFS= read -r file; do
+            jq empty "${file}" >/dev/null
+            basename "${file}" | sed 's#^#validated raw file: #'
+          done <<< "${raw_files}"
+
+          if grep -Fq "핵심 질문 1" RESULTS.md; then
+            echo "RESULTS.md still contains placeholder template content"
+            exit 1
+          fi

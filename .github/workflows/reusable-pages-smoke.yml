@@ -1,0 +1,50 @@
+name: reusable-pages-smoke
+
+on:
+  workflow_call:
+    inputs:
+      url:
+        description: Absolute GitHub Pages URL
+        required: true
+        type: string
+      expected_title:
+        description: Optional expected page title substring
+        required: false
+        type: string
+        default: ""
+      fallback_query:
+        description: Optional query string to probe after the main page
+        required: false
+        type: string
+        default: ""
+
+jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check primary page
+        shell: bash
+        run: |
+          set -euo pipefail
+          status="$(curl -I -L -s -o /dev/null -w '%{http_code}' "${{ inputs.url }}")"
+          if [[ "${status}" != "200" ]]; then
+            echo "unexpected status: ${status}"
+            exit 1
+          fi
+
+          html="$(curl -fsSL "${{ inputs.url }}")"
+          if [[ -n "${{ inputs.expected_title }}" ]] && [[ "${html}" != *"<title>${{ inputs.expected_title }}</title>"* ]] && [[ "${html}" != *"${{ inputs.expected_title }}"* ]]; then
+            echo "expected title not found"
+            exit 1
+          fi
+
+      - name: Check fallback query
+        if: ${{ inputs.fallback_query != '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          status="$(curl -I -L -s -o /dev/null -w '%{http_code}' "${{ inputs.url }}${{ inputs.fallback_query }}")"
+          if [[ "${status}" != "200" ]]; then
+            echo "unexpected fallback status: ${status}"
+            exit 1
+          fi
